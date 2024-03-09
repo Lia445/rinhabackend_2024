@@ -1,0 +1,76 @@
+version: "3.5"
+
+services:
+  api01: &api
+    # Lembre-se de que seu serviço HTTP deve estar hospedado num repositório
+    # publicamente acessível! Ex.: hub.docker.com
+    # image: lia445/rinha_backend2024:latest
+    build: .
+    restart: always
+    hostname: api01
+    environment:
+      - DB_DATABASE=rinha_2024
+      - DB_USER=root
+      - DB_HOST=db
+      - DB_PASSWORD=senha
+
+    ports:
+      - "5001:5000"
+    depends_on:
+      - db
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "170MB"
+
+  api02:
+    # Essa sintaxe reusa o que foi declarado em 'api01'.
+    <<: *api 
+    hostname: api02
+    ports:
+      - "5002:5000"
+ 
+  proxy:
+    image: nginx:alpine
+    restart: always
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api01
+      - api02
+    ports:
+        # Obrigatório expor/usar a porta 9999 no load balancer!
+      - "9999:9999" 
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: "20MB"
+
+  db:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_DATABASE: rinha_2024
+      MYSQL_ROOT_PASSWORD: senha
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./script.sql:/docker-entrypoint-initdb.d/script.sql:ro
+      # - ./banco:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: "0.8"
+          memory: "500MB"
+    
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+
+networks:
+  default:
+    driver: bridge
+    name: rinha-nginx-2024q1

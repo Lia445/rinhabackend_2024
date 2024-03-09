@@ -1,0 +1,5 @@
+banco/
+venv/
+load-test/
+Dockerfile
+docker-compose.yml
