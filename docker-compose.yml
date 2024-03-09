@@ -17,7 +17,8 @@ services:
     ports:
       - "5001:5000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -64,6 +65,11 @@ services:
         limits:
           cpus: "0.8"
           memory: "500MB"
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u root --password=$$MYSQL_ROOT_PASSWORD
+      interval: 5s
+      timeout: 5s
+      retries: 20
     
   adminer:
     image: adminer
