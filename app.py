@@ -1,6 +1,5 @@
 from datetime import datetime
 from flask import Flask,  request
-from furl import furl
 import mysql.connector
 import os
 
@@ -19,19 +18,22 @@ pool = mysql.connector.pooling.MySQLConnectionPool(pool_name="pool_mysql", pool_
 
 @app.route("/clientes/<id>/transacoes", methods=["POST"])
 def transacoes(id):
-    f = furl(request.url)
-    if len(f.args) != 3:
-        return "informacoes incorretas", 450
+    parametros = request.json
+    app.logger.debug(parametros)
+    
     try:
-        valor = int(f.args["valor"])
+        valor = int(parametros["valor"])
     except:
-        return "valor deve ser um número inteiro", 400   
-    tipo = f.args["tipo"]
+        app.logger.debug("valor deve ser um número inteiro")
+        return "valor deve ser um número inteiro", 422   
+    tipo = parametros["tipo"]
     if tipo not in ["c", "d"]:
-        return "tipo deve ser c ou d", 401
-    descricao = f.args["descricao"]
+        app.logger.debug("tipo deve ser c ou d")
+        return "tipo deve ser c ou d", 422
+    descricao = parametros["descricao"]
     if len(descricao) > 10:
-        return "descrição deve ter no máximo 10 caracteres", 402
+        app.logger.debug("descrição deve ter no máximo 10 caracteres")
+        return "descrição deve ter no máximo 10 caracteres", 422
     
     conexao = pool.get_connection()
     cursor = conexao.cursor()
@@ -39,10 +41,12 @@ def transacoes(id):
         cursor.execute(f"SELECT saldo, limite FROM clientes WHERE id = {id}")
     except:
         conexao.close()
+        app.logger.debug("erro transacoes dados")
         return "não foi possível acessar o banco de dados", 500
     dados = cursor.fetchall()
     if not dados:
         conexao.close()
+        app.logger.debug("id não existente")
         return "id não existente", 404
     
     saldo = dados[0][0]
@@ -51,7 +55,8 @@ def transacoes(id):
     if tipo == "d":
         if saldo - valor < (-limite):
             conexao.close()
-            return "saldo insuficiente", 405
+            app.logger.debug("saldo insuficiente")
+            return "saldo insuficiente", 422
         else:
             try:
                 saldo = saldo - valor
@@ -61,6 +66,7 @@ def transacoes(id):
             except:
                 cursor.execute("ROLLBACK")
                 conexao.close()
+                app.logger.debug("erro transacoes d")
                 return "não foi possível acessar o banco de dados", 500
     elif tipo == "c":
         try:
@@ -71,6 +77,7 @@ def transacoes(id):
         except:
                 cursor.execute("ROLLBACK")
                 conexao.close()
+                app.logger.debug("erro transacoes c")
                 return "não foi possível acessar o banco de dados", 500
    
     resultado = {
@@ -89,6 +96,7 @@ def extrato(id):
         cursor.execute(f"SELECT valor, tipo, descricao, data FROM transacoes WHERE cliente_id = {id} limit 10")
     except:
         conexao.close()
+        app.logger.debug("erro extrato transacoes")
         return "não foi possível acessar o banco de dados", 500
     transacoes = cursor.fetchall()
     
@@ -106,8 +114,14 @@ def extrato(id):
         cursor.execute(f"SELECT saldo, limite FROM clientes WHERE id = {id}")
     except:
         conexao.close()
+        app.logger.debug("erro extrato clientes")
         return "não foi possível acessar o banco de dados", 500
+    
     dados = cursor.fetchall()
+    if not dados:
+        conexao.close()
+        app.logger.debug("id não existente")
+        return "id não existente", 404
     
     extrato = {
         "saldo": {
